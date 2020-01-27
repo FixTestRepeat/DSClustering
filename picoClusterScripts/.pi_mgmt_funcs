@@ -1,0 +1,61 @@
+#### Shell history settings ####
+HISTFILESIZE=2000000
+HISTSIZE=1000000
+HISTCONTROL=ignoreboth
+HISTIGNORE='ls:ll:ls -alh:pwd:clear:history'
+HISTTIMEFORMAT='%F %T '
+shopt -s histappend
+shopt -s cmdhist
+export PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
+
+#### colour deciders ####
+thisnode=$(hostname -s)
+
+if [[ "$thisnode" == "picoM" ]] ; then 
+	color='\[\e[38;5;34m\e[48;5;4m\]'
+elif [[ "$thisnode" =~ pico([0-9]) ]] ; then
+	let offset=94+${BASH_REMATCH[1]}*4
+	color="\[\e[38;5;${offset}m\]"
+else
+	color=FAILEDTOSET
+fi
+
+#############################
+# set the prompt
+
+#Set UTF Smiley prompt
+PS1="$color\t \u@\h \w \`if [ \$? = 0 ]; then echo -e '\[\e[01;32m\]\U1F607'; else echo -e '\[\e[01;31m\]\U1F92C'; fi\` \[\e[01;34m\]\[\e[00m\] "
+
+#Non-UTF8 version
+#PS1="$color\t \u@\h \w \`if [ \$? = 0 ]; then echo -e '\[\e[01;32m\]:)'; else echo -e '\[\e[01;31m\]:('; fi\` \[\e[01;34m\]\[\e[00m\]"
+
+#############################
+slavepies=($(grep "pico" /etc/hosts | awk '{print $2}' | grep -v $(hostname)))
+
+#Execute on all Pies
+function eoa {
+  for pi in ${slavepies[*]}; do 
+    ssh $pi "$@"; 
+    [[ "$?" -ne "0" ]] && return $? 
+  done
+  $@
+  [[ "$?" -ne "0" ]] && return $? 
+}
+
+#Execute on all slave Pies. Will stop on error.
+function eos {
+  for pi in ${slavepies[*]}; do 
+    ssh $pi "$@";
+    [[ "$?" -ne "0" ]] && return $?
+  done
+  return 0
+}
+
+#scp from 'here' to 'there' for all pies. Will stop on error
+function slavescp {
+  for pi in $(otherpis); do 
+    scp -r "$1" $pi:"$2" ; 
+    [[ "$?" -ne "0" ]] && return $?
+  done
+  return 0
+}
